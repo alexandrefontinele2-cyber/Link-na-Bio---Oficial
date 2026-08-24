@@ -6,7 +6,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { HeroProfileSection } from './components/sections/HeroProfileSection';
 import { BioLinksSection } from './components/sections/BioLinksSection';
-import { MarqueeSection } from './components/sections/MarqueeSection';
+import { MarqueeSection, MarqueeMediaItem } from './components/sections/MarqueeSection';
 import { AboutSection } from './components/sections/AboutSection';
 import { ServicesSection } from './components/sections/ServicesSection';
 import { ProjectsSection, ProjectData } from './components/sections/ProjectsSection';
@@ -20,9 +20,12 @@ import { Toast } from './components/common/Toast';
 import { getMediaItem, saveMediaItem } from './utils/mediaDb';
 import { subscribeToSiteData, saveGlobalSiteData, getGlobalSiteData } from './lib/firebase';
 import { optimizeImageForCloud } from './utils/imageOptimizer';
+import { EMBEDDED_MARQUEE_ROW1, EMBEDDED_MARQUEE_ROW2 } from './data/defaultMedia';
 
 const STORAGE_AVATAR_KEY = 'alexandre_fontinele_avatar_photo';
 const STORAGE_PROJECTS_KEY = 'af_project_custom_images';
+const STORAGE_KEY_ROW1 = 'af_marquee_row1_media';
+const STORAGE_KEY_ROW2 = 'af_marquee_row2_media';
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600&auto=format&fit=crop';
 
 export default function App() {
@@ -43,6 +46,8 @@ export default function App() {
 
   const [avatarUrl, setAvatarUrl] = useState<string>(DEFAULT_AVATAR);
   const [projectImages, setProjectImages] = useState<Record<string, string>>({});
+  const [marqueeRow1, setMarqueeRow1] = useState<MarqueeMediaItem[]>(EMBEDDED_MARQUEE_ROW1);
+  const [marqueeRow2, setMarqueeRow2] = useState<MarqueeMediaItem[]>(EMBEDDED_MARQUEE_ROW2);
 
   // 1. Initial load from LocalStorage / IndexedDB + Cloud Firestore Realtime Sync
   useEffect(() => {
@@ -56,7 +61,13 @@ export default function App() {
       const cachedProjects = await getMediaItem<Record<string, string>>(STORAGE_PROJECTS_KEY, {});
       if (cachedProjects && isMounted) setProjectImages(cachedProjects);
 
-      // Step B: Fetch direct from Firestore
+      const cachedRow1 = await getMediaItem<MarqueeMediaItem[]>(STORAGE_KEY_ROW1, EMBEDDED_MARQUEE_ROW1);
+      if (cachedRow1 && cachedRow1.length > 0 && isMounted) setMarqueeRow1(cachedRow1);
+
+      const cachedRow2 = await getMediaItem<MarqueeMediaItem[]>(STORAGE_KEY_ROW2, EMBEDDED_MARQUEE_ROW2);
+      if (cachedRow2 && cachedRow2.length > 0 && isMounted) setMarqueeRow2(cachedRow2);
+
+      // Step B: Fetch directly from Cloud Firestore
       const cloudData = await getGlobalSiteData();
       if (cloudData && isMounted) {
         if (cloudData.avatarUrl) {
@@ -66,6 +77,14 @@ export default function App() {
         if (cloudData.projectImages) {
           setProjectImages(cloudData.projectImages);
           await saveMediaItem(STORAGE_PROJECTS_KEY, cloudData.projectImages);
+        }
+        if (cloudData.marqueeRow1 && cloudData.marqueeRow1.length > 0) {
+          setMarqueeRow1(cloudData.marqueeRow1);
+          await saveMediaItem(STORAGE_KEY_ROW1, cloudData.marqueeRow1);
+        }
+        if (cloudData.marqueeRow2 && cloudData.marqueeRow2.length > 0) {
+          setMarqueeRow2(cloudData.marqueeRow2);
+          await saveMediaItem(STORAGE_KEY_ROW2, cloudData.marqueeRow2);
         }
       }
 
@@ -88,7 +107,7 @@ export default function App() {
 
     initData();
 
-    // Step C: Subscribe to Realtime Updates from Cloud Firestore across all devices
+    // Step C: Subscribe to Realtime Updates from Cloud Firestore across all devices & browsers
     const unsubscribe = subscribeToSiteData((cloudData) => {
       if (!isMounted || !cloudData) return;
       if (cloudData.avatarUrl) {
@@ -98,6 +117,14 @@ export default function App() {
       if (cloudData.projectImages) {
         setProjectImages(cloudData.projectImages);
         saveMediaItem(STORAGE_PROJECTS_KEY, cloudData.projectImages);
+      }
+      if (cloudData.marqueeRow1 && cloudData.marqueeRow1.length > 0) {
+        setMarqueeRow1(cloudData.marqueeRow1);
+        saveMediaItem(STORAGE_KEY_ROW1, cloudData.marqueeRow1);
+      }
+      if (cloudData.marqueeRow2 && cloudData.marqueeRow2.length > 0) {
+        setMarqueeRow2(cloudData.marqueeRow2);
+        saveMediaItem(STORAGE_KEY_ROW2, cloudData.marqueeRow2);
       }
     });
 
@@ -179,6 +206,40 @@ export default function App() {
     }
   };
 
+  const handleUpdateMarqueeSlot = async (
+    row: 1 | 2,
+    index: number,
+    newItem: MarqueeMediaItem
+  ) => {
+    try {
+      if (row === 1) {
+        const updated = [...marqueeRow1];
+        updated[index] = newItem;
+        setMarqueeRow1(updated);
+        await saveMediaItem(STORAGE_KEY_ROW1, updated);
+        await saveGlobalSiteData({ marqueeRow1: updated });
+      } else {
+        const updated = [...marqueeRow2];
+        updated[index] = newItem;
+        setMarqueeRow2(updated);
+        await saveMediaItem(STORAGE_KEY_ROW2, updated);
+        await saveGlobalSiteData({ marqueeRow2: updated });
+      }
+      showToast(`Mídia da Linha ${row} salva na nuvem para todos os usuários!`);
+    } catch (err) {
+      console.error('Error saving marquee slot:', err);
+      showToast('Erro ao sincronizar com a nuvem.');
+    }
+  };
+
+  const handleUpdateMarqueeRow1 = (items: MarqueeMediaItem[]) => {
+    setMarqueeRow1(items);
+  };
+
+  const handleUpdateMarqueeRow2 = (items: MarqueeMediaItem[]) => {
+    setMarqueeRow2(items);
+  };
+
   return (
     <div className="min-h-screen w-full deep-navy-mesh text-[#D7E2EA] font-['Kanit',sans-serif] flex justify-center items-start sm:py-6 px-0 sm:px-4 selection:bg-[#1e40af] selection:text-white relative">
       {/* Floating Admin Toolbar (Visible only when Alexandre is logged in) */}
@@ -212,8 +273,14 @@ export default function App() {
         {/* 2. BioLinksSection (Links específicos em Português) */}
         <BioLinksSection onOpenLink={handleOpenLink} />
 
-        {/* 3. MarqueeSection (Mídias e animações contínuas em loop) */}
-        <MarqueeSection isAdmin={isAdmin} onToast={showToast} />
+        {/* 3. MarqueeSection (Mídias e animações contínuas em loop abaixo de Palestras e Oficinas) */}
+        <MarqueeSection
+          isAdmin={isAdmin}
+          row1Items={marqueeRow1}
+          row2Items={marqueeRow2}
+          onUpdateSlot={handleUpdateMarqueeSlot}
+          onToast={showToast}
+        />
 
         {/* 4. AboutSection (Sobre Mim com texto alinhado sem quebra) */}
         <AboutSection onOpenContact={() => handleOpenContact()} />
@@ -284,6 +351,10 @@ export default function App() {
         onUpdateAvatar={handleUpdateAvatar}
         projectImages={projectImages}
         onUpdateProjectImage={handleUpdateProjectImage}
+        marqueeRow1={marqueeRow1}
+        marqueeRow2={marqueeRow2}
+        onUpdateMarqueeRow1={handleUpdateMarqueeRow1}
+        onUpdateMarqueeRow2={handleUpdateMarqueeRow2}
         onToast={showToast}
       />
 

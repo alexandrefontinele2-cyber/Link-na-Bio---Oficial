@@ -1,7 +1,8 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { getMediaItem, saveMediaItem } from '../../utils/mediaDb';
-import { EMBEDDED_MARQUEE_ROW1, EMBEDDED_MARQUEE_ROW2, MediaAsset } from '../../data/defaultMedia';
+import { Camera } from 'lucide-react';
+import { EMBEDDED_MARQUEE_ROW1, EMBEDDED_MARQUEE_ROW2 } from '../../data/defaultMedia';
+import { optimizeImageForCloud } from '../../utils/imageOptimizer';
 
 export interface MarqueeMediaItem {
   id: string;
@@ -10,38 +11,24 @@ export interface MarqueeMediaItem {
   title?: string;
 }
 
-const STORAGE_KEY_ROW1 = 'af_marquee_row1_media';
-const STORAGE_KEY_ROW2 = 'af_marquee_row2_media';
-
 interface MarqueeSectionProps {
   isAdmin?: boolean;
+  row1Items?: MarqueeMediaItem[];
+  row2Items?: MarqueeMediaItem[];
+  onUpdateSlot?: (row: 1 | 2, index: number, newItem: MarqueeMediaItem) => void;
   onToast?: (msg: string) => void;
 }
 
-export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ isAdmin = false, onToast }) => {
+export const MarqueeSection: React.FC<MarqueeSectionProps> = ({
+  isAdmin = false,
+  row1Items = EMBEDDED_MARQUEE_ROW1,
+  row2Items = EMBEDDED_MARQUEE_ROW2,
+  onUpdateSlot,
+  onToast,
+}) => {
   const sectionRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<{ row: 1 | 2; index: number } | null>(null);
-
-  const [row1Items, setRow1Items] = useState<MarqueeMediaItem[]>(EMBEDDED_MARQUEE_ROW1);
-  const [row2Items, setRow2Items] = useState<MarqueeMediaItem[]>(EMBEDDED_MARQUEE_ROW2);
-
-  // Load from IndexedDB / LocalStorage if user has custom uploads, otherwise fallback to embedded
-  useEffect(() => {
-    let isMounted = true;
-    async function loadStoredMedia() {
-      const savedRow1 = await getMediaItem<MarqueeMediaItem[]>(STORAGE_KEY_ROW1, EMBEDDED_MARQUEE_ROW1);
-      const savedRow2 = await getMediaItem<MarqueeMediaItem[]>(STORAGE_KEY_ROW2, EMBEDDED_MARQUEE_ROW2);
-      if (isMounted) {
-        if (savedRow1 && savedRow1.length > 0) setRow1Items(savedRow1);
-        if (savedRow2 && savedRow2.length > 0) setRow2Items(savedRow2);
-      }
-    }
-    loadStoredMedia();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -59,9 +46,9 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ isAdmin = false,
     fileInputRef.current?.click();
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !selectedSlotIndex) return;
+    if (!file || !selectedSlotIndex || !onUpdateSlot) return;
 
     const isVideo =
       file.type.startsWith('video/') ||
@@ -71,36 +58,51 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ isAdmin = false,
     const isGif = file.type === 'image/gif' || file.name.endsWith('.gif');
     const mediaType: 'image' | 'video' | 'gif' = isVideo ? 'video' : isGif ? 'gif' : 'image';
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const result = reader.result as string;
-      const { row, index } = selectedSlotIndex;
+    const { row, index } = selectedSlotIndex;
 
-      if (row === 1) {
-        const updated = [...row1Items];
-        updated[index] = {
-          id: `r1-custom-${Date.now()}`,
-          url: result,
-          type: mediaType,
+    try {
+      if (isVideo) {
+        onToast?.('Processando e enviando vídeo para a nuvem...');
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          onUpdateSlot(row, index, {
+            id: `r${row}-${index}-${Date.now()}`,
+            url: result,
+            type: 'video',
+            title: `Vídeo ${row === 1 ? 'Linha 1' : 'Linha 2'} #${index + 1}`,
+          });
         };
-        setRow1Items(updated);
-        await saveMediaItem(STORAGE_KEY_ROW1, updated);
+        reader.readAsDataURL(file);
+      } else if (isGif) {
+        onToast?.('Processando GIF animado...');
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          onUpdateSlot(row, index, {
+            id: `r${row}-${index}-${Date.now()}`,
+            url: result,
+            type: 'gif',
+            title: `GIF ${row === 1 ? 'Linha 1' : 'Linha 2'} #${index + 1}`,
+          });
+        };
+        reader.readAsDataURL(file);
       } else {
-        const updated = [...row2Items];
-        updated[index] = {
-          id: `r2-custom-${Date.now()}`,
-          url: result,
-          type: mediaType,
-        };
-        setRow2Items(updated);
-        await saveMediaItem(STORAGE_KEY_ROW2, updated);
+        onToast?.('Otimizando imagem para nuvem...');
+        const optimizedUrl = await optimizeImageForCloud(file, 800, 600, 0.82);
+        onUpdateSlot(row, index, {
+          id: `r${row}-${index}-${Date.now()}`,
+          url: optimizedUrl,
+          type: 'image',
+          title: `Foto ${row === 1 ? 'Linha 1' : 'Linha 2'} #${index + 1}`,
+        });
       }
-
-      onToast?.(isVideo ? 'Vídeo salvo e fixado com sucesso!' : 'Mídia salva e fixada com sucesso!');
+    } catch (err) {
+      console.error('Error uploading marquee media:', err);
+      onToast?.('Erro ao processar arquivo.');
+    } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
-    };
-
-    reader.readAsDataURL(file);
+    }
   };
 
   // Repeated sets to ensure seamless scroll coverage
@@ -124,7 +126,7 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ isAdmin = false,
           muted
           playsInline
           preload="auto"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover pointer-events-none"
         />
       );
     }
@@ -132,9 +134,9 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ isAdmin = false,
     return (
       <img
         src={item.url}
-        alt={item.title || "Preview de trabalho e mídia animada"}
+        alt={item.title || 'Preview de trabalho e mídia animada'}
         loading="lazy"
-        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none"
         onError={(e) => {
           e.currentTarget.src =
             'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=400&auto=format&fit=crop';
@@ -179,10 +181,20 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ isAdmin = false,
                 className={`relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md ${
                   isAdmin ? 'cursor-pointer' : ''
                 }`}
-                title={isAdmin ? 'Clique caso queira reanexar ou ajustar seu vídeo/foto' : undefined}
+                title={isAdmin ? 'Clique para trocar o vídeo ou foto deste slot' : undefined}
               >
                 {renderMedia(item)}
                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors duration-200 pointer-events-none" />
+
+                {/* Admin indicator overlay on hover */}
+                {isAdmin && (
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white pointer-events-none">
+                    <Camera className="w-4 h-4 text-[#38bdf8]" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-white">
+                      Editar Mídia
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -202,10 +214,20 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ isAdmin = false,
                 className={`relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md ${
                   isAdmin ? 'cursor-pointer' : ''
                 }`}
-                title={isAdmin ? 'Clique caso queira reanexar ou ajustar seu vídeo/foto' : undefined}
+                title={isAdmin ? 'Clique para trocar o vídeo ou foto deste slot' : undefined}
               >
                 {renderMedia(item)}
                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors duration-200 pointer-events-none" />
+
+                {/* Admin indicator overlay on hover */}
+                {isAdmin && (
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white pointer-events-none">
+                    <Camera className="w-4 h-4 text-[#38bdf8]" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-white">
+                      Editar Mídia
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
