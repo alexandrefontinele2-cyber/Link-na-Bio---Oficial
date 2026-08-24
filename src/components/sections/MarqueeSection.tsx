@@ -1,58 +1,178 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
+import { Camera, Video } from 'lucide-react';
+import { getMediaItem, saveMediaItem } from '../../utils/mediaDb';
 
-const ROW1_IMAGES = [
-  'https://motionsites.ai/assets/hero-space-voyage-preview-eECLH3Yc.gif',
-  'https://motionsites.ai/assets/hero-codenest-preview-Cgppc2qV.gif',
-  'https://motionsites.ai/assets/hero-vex-ventures-preview-BczMFIiw.gif',
-  'https://motionsites.ai/assets/hero-stellar-ai-v2-preview-DjvxjG3C.gif',
-  'https://motionsites.ai/assets/hero-asme-preview-B_nGDnTP.gif',
-  'https://motionsites.ai/assets/hero-transform-data-preview-Cx5OU29N.gif',
-  'https://motionsites.ai/assets/hero-vitara-preview-Cjz2QYyU.gif',
-  'https://motionsites.ai/assets/hero-terra-preview-BFjrCr7T.gif',
-  'https://motionsites.ai/assets/hero-skyelite-preview-DHaZIgUv.gif',
-  'https://motionsites.ai/assets/hero-aethera-preview-DknSlcTa.gif',
-  'https://motionsites.ai/assets/hero-designpro-preview-D8c5_een.gif',
-];
-
-const ROW2_IMAGES = [
-  'https://motionsites.ai/assets/hero-stellar-ai-preview-D3HL6bw1.gif',
-  'https://motionsites.ai/assets/hero-xportfolio-preview-D4A8maiC.gif',
-  'https://motionsites.ai/assets/hero-orbit-web3-preview-BXt4OttD.gif',
-  'https://motionsites.ai/assets/hero-nexora-preview-cx5HmUgo.gif',
-  'https://motionsites.ai/assets/hero-evr-ventures-preview-DZxeVFEX.gif',
-  'https://motionsites.ai/assets/hero-planet-orbit-preview-DWAP8Z1P.gif',
-  'https://motionsites.ai/assets/hero-new-era-preview-CocuDUm9.gif',
-  'https://motionsites.ai/assets/hero-wealth-preview-B70idl_u.gif',
-  'https://motionsites.ai/assets/hero-luminex-preview-CxOP7ce6.gif',
-  'https://motionsites.ai/assets/hero-celestia-preview-0yO3jXO8.gif',
-];
-
-// Tripled sets to ensure seamless scroll coverage
-const TRIPLED_ROW1 = [...ROW1_IMAGES, ...ROW1_IMAGES, ...ROW1_IMAGES];
-const TRIPLED_ROW2 = [...ROW2_IMAGES, ...ROW2_IMAGES, ...ROW2_IMAGES];
-
-interface MarqueeSectionProps {
-  onImageClick?: (url: string) => void;
+export interface MarqueeMediaItem {
+  id: string;
+  url: string;
+  type: 'image' | 'video' | 'gif';
 }
 
-export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onImageClick }) => {
+const DEFAULT_ROW1: MarqueeMediaItem[] = [
+  { id: 'r1-1', url: 'https://motionsites.ai/assets/hero-space-voyage-preview-eECLH3Yc.gif', type: 'gif' },
+  { id: 'r1-2', url: 'https://motionsites.ai/assets/hero-codenest-preview-Cgppc2qV.gif', type: 'gif' },
+  { id: 'r1-3', url: 'https://motionsites.ai/assets/hero-vex-ventures-preview-BczMFIiw.gif', type: 'gif' },
+  { id: 'r1-4', url: 'https://motionsites.ai/assets/hero-stellar-ai-v2-preview-DjvxjG3C.gif', type: 'gif' },
+  { id: 'r1-5', url: 'https://motionsites.ai/assets/hero-asme-preview-B_nGDnTP.gif', type: 'gif' },
+  { id: 'r1-6', url: 'https://motionsites.ai/assets/hero-transform-data-preview-Cx5OU29N.gif', type: 'gif' },
+  { id: 'r1-7', url: 'https://motionsites.ai/assets/hero-vitara-preview-Cjz2QYyU.gif', type: 'gif' },
+  { id: 'r1-8', url: 'https://motionsites.ai/assets/hero-terra-preview-BFjrCr7T.gif', type: 'gif' },
+];
+
+const DEFAULT_ROW2: MarqueeMediaItem[] = [
+  { id: 'r2-1', url: 'https://motionsites.ai/assets/hero-stellar-ai-preview-D3HL6bw1.gif', type: 'gif' },
+  { id: 'r2-2', url: 'https://motionsites.ai/assets/hero-xportfolio-preview-D4A8maiC.gif', type: 'gif' },
+  { id: 'r2-3', url: 'https://motionsites.ai/assets/hero-orbit-web3-preview-BXt4OttD.gif', type: 'gif' },
+  { id: 'r2-4', url: 'https://motionsites.ai/assets/hero-nexora-preview-cx5HmUgo.gif', type: 'gif' },
+  { id: 'r2-5', url: 'https://motionsites.ai/assets/hero-evr-ventures-preview-DZxeVFEX.gif', type: 'gif' },
+  { id: 'r2-6', url: 'https://motionsites.ai/assets/hero-planet-orbit-preview-DWAP8Z1P.gif', type: 'gif' },
+  { id: 'r2-7', url: 'https://motionsites.ai/assets/hero-new-era-preview-CocuDUm9.gif', type: 'gif' },
+  { id: 'r2-8', url: 'https://motionsites.ai/assets/hero-wealth-preview-B70idl_u.gif', type: 'gif' },
+];
+
+const STORAGE_KEY_ROW1 = 'af_marquee_row1_media';
+const STORAGE_KEY_ROW2 = 'af_marquee_row2_media';
+
+interface MarqueeSectionProps {
+  onToast?: (msg: string) => void;
+}
+
+export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onToast }) => {
   const sectionRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedSlotIndex, setSelectedSlotIndex] = useState<{ row: 1 | 2; index: number } | null>(null);
+
+  const [row1Items, setRow1Items] = useState<MarqueeMediaItem[]>(DEFAULT_ROW1);
+  const [row2Items, setRow2Items] = useState<MarqueeMediaItem[]>(DEFAULT_ROW2);
+
+  // Load from IndexedDB (persists high-capacity video and images indefinitely)
+  useEffect(() => {
+    let isMounted = true;
+    async function loadStoredMedia() {
+      const savedRow1 = await getMediaItem<MarqueeMediaItem[]>(STORAGE_KEY_ROW1, DEFAULT_ROW1);
+      const savedRow2 = await getMediaItem<MarqueeMediaItem[]>(STORAGE_KEY_ROW2, DEFAULT_ROW2);
+      if (isMounted) {
+        if (savedRow1 && savedRow1.length > 0) setRow1Items(savedRow1);
+        if (savedRow2 && savedRow2.length > 0) setRow2Items(savedRow2);
+      }
+    }
+    loadStoredMedia();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ['start end', 'end start'],
   });
 
-  // Row 1: Moves RIGHT on scroll (e.g. from -500px to 0px or -30% to 10%)
+  // Row 1: Moves RIGHT on scroll
   const xRow1 = useTransform(scrollYProgress, [0, 1], ['-35%', '5%']);
-  // Row 2: Moves LEFT on scroll (e.g. from 5% to -35%)
+  // Row 2: Moves LEFT on scroll
   const xRow2 = useTransform(scrollYProgress, [0, 1], ['5%', '-35%']);
+
+  const handleCardClick = (row: 1 | 2, index: number) => {
+    setSelectedSlotIndex({ row, index });
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedSlotIndex) return;
+
+    const isVideo = file.type.startsWith('video/') || file.name.endsWith('.mp4') || file.name.endsWith('.mov') || file.name.endsWith('.webm');
+    const isGif = file.type === 'image/gif' || file.name.endsWith('.gif');
+    const mediaType: 'image' | 'video' | 'gif' = isVideo ? 'video' : isGif ? 'gif' : 'image';
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const result = reader.result as string;
+      const { row, index } = selectedSlotIndex;
+
+      if (row === 1) {
+        const updated = [...row1Items];
+        updated[index] = {
+          id: `r1-custom-${Date.now()}`,
+          url: result,
+          type: mediaType,
+        };
+        setRow1Items(updated);
+        await saveMediaItem(STORAGE_KEY_ROW1, updated);
+      } else {
+        const updated = [...row2Items];
+        updated[index] = {
+          id: `r2-custom-${Date.now()}`,
+          url: result,
+          type: mediaType,
+        };
+        setRow2Items(updated);
+        await saveMediaItem(STORAGE_KEY_ROW2, updated);
+      }
+
+      onToast?.(isVideo ? 'Vídeo salvo e fixado com sucesso!' : 'Mídia salva e fixada com sucesso!');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    reader.readAsDataURL(file);
+  };
+
+  // Repeated sets to ensure seamless scroll coverage
+  const displayRow1 = [...row1Items, ...row1Items, ...row1Items];
+  const displayRow2 = [...row2Items, ...row2Items, ...row2Items];
+
+  const renderMedia = (item: MarqueeMediaItem) => {
+    const isVideo =
+      item.type === 'video' ||
+      item.url.startsWith('data:video') ||
+      item.url.endsWith('.mp4') ||
+      item.url.endsWith('.webm') ||
+      item.url.endsWith('.mov');
+
+    if (isVideo) {
+      return (
+        <video
+          src={item.url}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          className="w-full h-full object-cover"
+        />
+      );
+    }
+
+    return (
+      <img
+        src={item.url}
+        alt="Preview de trabalho e mídia animada"
+        loading="lazy"
+        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        onError={(e) => {
+          e.currentTarget.src =
+            'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=400&auto=format&fit=crop';
+        }}
+      />
+    );
+  };
 
   return (
     <section
       ref={sectionRef}
-      className="bg-[#060e1d] py-8 overflow-hidden relative select-none w-full"
+      className="bg-[#060e1d] py-6 overflow-hidden relative select-none w-full border-y border-[#1a2c4e]/50"
     >
+      {/* Hidden file input for uploading and saving video or image */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="video/mp4,video/webm,video/quicktime,video/*,image/*,image/gif"
+        onChange={handleFileUpload}
+        className="hidden"
+        aria-label="Upload de vídeo ou foto"
+      />
+
       {/* Subtle vignette gradient on edges */}
       <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#060e1d] to-transparent z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#060e1d] to-transparent z-10 pointer-events-none" />
@@ -63,25 +183,20 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onImageClick }) 
           style={{ x: xRow1 }}
           className="flex gap-2.5 w-max will-change-transform"
         >
-          {TRIPLED_ROW1.map((url, index) => (
-            <div
-              key={`row1-${index}`}
-              onClick={() => onImageClick?.(url)}
-              className="relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#262626] bg-[#141414] group cursor-pointer"
-            >
-              <img
-                src={url}
-                alt="3D Work preview"
-                loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                onError={(e) => {
-                  e.currentTarget.src =
-                    'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=400&auto=format&fit=crop';
-                }}
-              />
-              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors duration-200" />
-            </div>
-          ))}
+          {displayRow1.map((item, index) => {
+            const originalIndex = index % row1Items.length;
+            return (
+              <div
+                key={`row1-${index}-${item.id}`}
+                onClick={() => handleCardClick(1, originalIndex)}
+                className="relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md cursor-pointer"
+                title="Clique caso queira reanexar ou ajustar seu vídeo/foto"
+              >
+                {renderMedia(item)}
+                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors duration-200 pointer-events-none" />
+              </div>
+            );
+          })}
         </motion.div>
 
         {/* Row 2 - Moves LEFT on scroll */}
@@ -89,25 +204,20 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onImageClick }) 
           style={{ x: xRow2 }}
           className="flex gap-2.5 w-max will-change-transform"
         >
-          {TRIPLED_ROW2.map((url, index) => (
-            <div
-              key={`row2-${index}`}
-              onClick={() => onImageClick?.(url)}
-              className="relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#262626] bg-[#141414] group cursor-pointer"
-            >
-              <img
-                src={url}
-                alt="3D Work preview"
-                loading="lazy"
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                onError={(e) => {
-                  e.currentTarget.src =
-                    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=400&auto=format&fit=crop';
-                }}
-              />
-              <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors duration-200" />
-            </div>
-          ))}
+          {displayRow2.map((item, index) => {
+            const originalIndex = index % row2Items.length;
+            return (
+              <div
+                key={`row2-${index}-${item.id}`}
+                onClick={() => handleCardClick(2, originalIndex)}
+                className="relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md cursor-pointer"
+                title="Clique caso queira reanexar ou ajustar seu vídeo/foto"
+              >
+                {renderMedia(item)}
+                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors duration-200 pointer-events-none" />
+              </div>
+            );
+          })}
         </motion.div>
       </div>
     </section>

@@ -13,8 +13,8 @@ interface CharProps {
 }
 
 const Char: React.FC<CharProps> = ({ children, progress, range }) => {
-  const opacity = useTransform(progress, range, [0.15, 1]);
-  const y = useTransform(progress, range, [4, 0]);
+  const opacity = useTransform(progress, range, [0.2, 1]);
+  const y = useTransform(progress, range, [3, 0]);
 
   return (
     <motion.span
@@ -30,28 +30,50 @@ export const AnimatedText: React.FC<AnimatedTextProps> = ({ text, className = ''
   const containerRef = useRef<HTMLParagraphElement>(null);
   const { scrollYProgress } = useScroll({
     target: containerRef,
-    offset: ['start 85%', 'end 50%'],
+    offset: ['start 90%', 'end 55%'],
   });
 
-  const characters = text.split('');
-  const totalChars = characters.length;
+  // Split text into words to prevent breaking words across lines
+  const words = text.split(' ');
+  const totalChars = text.length;
+
+  let globalCharIndex = 0;
 
   return (
     <p
       ref={containerRef}
-      className={`relative inline-block select-none ${className}`}
+      className={`relative select-none text-balance leading-relaxed ${className}`}
+      style={{ wordBreak: 'normal', overflowWrap: 'normal', hyphens: 'none' }}
     >
-      {characters.map((char, index) => {
-        const start = index / totalChars;
-        const end = start + 1 / totalChars;
+      {words.map((word, wordIdx) => {
+        const wordChars = word.split('');
+        const renderedWord = (
+          <span key={`w-${wordIdx}`} className="inline-block whitespace-nowrap">
+            {wordChars.map((char, charIdx) => {
+              const charPosition = globalCharIndex++;
+              const start = charPosition / totalChars;
+              const end = start + 1 / totalChars;
+              return (
+                <Char
+                  key={`c-${wordIdx}-${charIdx}`}
+                  progress={scrollYProgress}
+                  range={[start, end]}
+                >
+                  {char}
+                </Char>
+              );
+            })}
+          </span>
+        );
+
+        // Account for the space in index count
+        globalCharIndex++;
+
         return (
-          <Char
-            key={index}
-            progress={scrollYProgress}
-            range={[start, end]}
-          >
-            {char === ' ' ? '\u00A0' : char}
-          </Char>
+          <React.Fragment key={`frag-${wordIdx}`}>
+            {renderedWord}
+            {wordIdx < words.length - 1 && ' '}
+          </React.Fragment>
         );
       })}
     </p>

@@ -21,10 +21,10 @@ const SERVICES: ServiceItem[] = [
   },
   {
     number: '02',
-    name: 'Treinamentos de Vendas & WhatsApp',
-    description: 'Capacitação prática para times comerciais baterem metas com scripts de alta conversão.',
-    tags: ['Script WhatsApp', 'Negociação', 'Gatilhos Mentais', 'Fechamento Rápido'],
-    deliverables: 'Playbook comercial customizado, workshops práticos e métricas de conversão.',
+    name: 'Treinamentos Corporativos',
+    description: 'Capacitação prática para equipes e times comerciais baterem metas com metodologia de alta conversão.',
+    tags: ['Treinamento In-Company', 'Vendas Consultivas', 'Liderança', 'Cultura de Performance'],
+    deliverables: 'Playbook corporativo customizado, workshops práticos e métricas de acompanhamento.',
   },
   {
     number: '03',

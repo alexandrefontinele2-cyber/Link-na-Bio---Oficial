@@ -58,11 +58,11 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ onOpenContact }) => 
           </h2>
         </FadeIn>
 
-        {/* Character-by-character Animated Paragraph in Portuguese */}
-        <div className="mb-8 px-2">
+        {/* Character-by-character Animated Paragraph with unbroken words */}
+        <div className="mb-8 px-1 w-full text-center">
           <AnimatedText
             text="Com vasta trajetória em mentoria estratégica, liderança e treinamentos de vendas, capacito profissionais e empresas a alcançarem resultados exponenciais e alta performance."
-            className="text-[#D7E2EA] font-medium text-center leading-relaxed text-sm"
+            className="text-[#D7E2EA] font-medium text-center leading-relaxed text-sm text-balance"
           />
         </div>
 

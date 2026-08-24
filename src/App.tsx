@@ -9,7 +9,7 @@ import { BioLinksSection } from './components/sections/BioLinksSection';
 import { MarqueeSection } from './components/sections/MarqueeSection';
 import { AboutSection } from './components/sections/AboutSection';
 import { ServicesSection } from './components/sections/ServicesSection';
-import { ProjectsSection, ProjectData, PROJECTS } from './components/sections/ProjectsSection';
+import { ProjectsSection, ProjectData } from './components/sections/ProjectsSection';
 import { FooterSection } from './components/sections/FooterSection';
 import { BookingModal } from './components/modals/BookingModal';
 import { ProjectModal } from './components/modals/ProjectModal';
@@ -63,27 +63,22 @@ export default function App() {
         ref={topRef}
         className="w-full max-w-[400px] min-h-screen sm:min-h-[844px] bg-[#060e1d] border-x sm:border-[8px] border-[#0e1d38] sm:rounded-[40px] relative overflow-x-hidden flex flex-col shadow-[0_50px_100px_-20px_rgba(2,6,23,0.9),0_0_50px_rgba(30,64,175,0.2)]"
       >
-        {/* 1. HeroProfileSection (Avatar com upload de foto real + Alexandre Fontinele + Subtítulo) */}
+        {/* 1. HeroProfileSection (Avatar com Alexandre Fontinele + Subtítulo) */}
         <HeroProfileSection
           onOpenContact={() => handleOpenContact()}
           onOpenSocial={handleOpenSocial}
-          onAvatarUpdated={showToast}
         />
 
-        {/* 2. BioLinksSection (Links específicos solicitados em Português) */}
+        {/* 2. BioLinksSection (Links específicos em Português) */}
         <BioLinksSection onOpenLink={handleOpenLink} />
 
-        {/* 3. MarqueeSection */}
-        <MarqueeSection
-          onImageClick={() => {
-            showToast('Visualizando cases e materiais...');
-          }}
-        />
+        {/* 3. MarqueeSection (Mídias e animações contínuas em loop) */}
+        <MarqueeSection onToast={showToast} />
 
-        {/* 4. AboutSection (Sobre Mim) */}
+        {/* 4. AboutSection (Sobre Mim com texto alinhado sem quebra) */}
         <AboutSection onOpenContact={() => handleOpenContact()} />
 
-        {/* 5. ServicesSection (Serviços e Soluções) */}
+        {/* 5. ServicesSection (Serviços e Soluções com Treinamentos Corporativos) */}
         <div ref={servicesRef}>
           <ServicesSection
             onSelectService={(serviceName) => {
@@ -92,7 +87,7 @@ export default function App() {
           />
         </div>
 
-        {/* 6. ProjectsSection (Cases & Metodologias) */}
+        {/* 6. ProjectsSection (Cases & Metodologias com Solução 1 Manual de IA e Solução 4 Instagram) */}
         <div ref={projectsRef}>
           <ProjectsSection
             onViewProject={(project) => {

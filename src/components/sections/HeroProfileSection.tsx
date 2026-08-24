@@ -1,13 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Instagram, Twitter, Linkedin, Youtube, Mail, Camera } from 'lucide-react';
+import { Instagram, Twitter, Linkedin, Youtube, Mail } from 'lucide-react';
 import { FadeIn } from '../common/FadeIn';
 import { Magnet } from '../common/Magnet';
 
 interface HeroProfileSectionProps {
   onOpenContact: () => void;
   onOpenSocial: (platform: string) => void;
-  onAvatarUpdated?: (msg: string) => void;
 }
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600&auto=format&fit=crop';
@@ -16,9 +15,8 @@ const STORAGE_KEY = 'alexandre_fontinele_avatar_photo';
 export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
   onOpenContact,
   onOpenSocial,
-  onAvatarUpdated,
 }) => {
-  const [avatarUrl, setAvatarUrl] = useState<string>(() => {
+  const [avatarUrl] = useState<string>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       return saved || DEFAULT_AVATAR;
@@ -26,35 +24,6 @@ export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
       return DEFAULT_AVATAR;
     }
   });
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      onAvatarUpdated?.('Por favor, selecione uma foto de até 5MB.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setAvatarUrl(result);
-      try {
-        localStorage.setItem(STORAGE_KEY, result);
-        onAvatarUpdated?.('Foto de perfil atualizada e salva!');
-      } catch {
-        onAvatarUpdated?.('Foto atualizada na sessão.');
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
 
   const socialLinks = [
     { name: 'Instagram', icon: Instagram, url: 'https://instagram.com' },
@@ -66,16 +35,6 @@ export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
 
   return (
     <header className="px-5 pt-8 pb-4 flex flex-col items-center text-center relative z-20">
-      {/* Hidden file input for real photo upload */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-        className="hidden"
-        aria-label="Upload de foto de perfil"
-      />
-
       {/* 1. Status Badge */}
       <FadeIn delay={0} y={-10}>
         <div
@@ -92,16 +51,12 @@ export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
         </div>
       </FadeIn>
 
-      {/* 2. Hero Portrait with Magnet effect + Photo Upload trigger */}
+      {/* 2. Hero Portrait with Magnet effect */}
       <FadeIn delay={0.15} y={20} className="mt-4 mb-3">
         <Magnet strength={22}>
-          <div
-            className="relative group cursor-pointer"
-            onClick={handleAvatarClick}
-            title="Clique para inserir ou alterar sua foto real"
-          >
+          <div className="relative group">
             {/* Glow halo */}
-            <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-[#1e40af]/40 via-[#B600A8]/30 to-[#3b82f6]/40 blur-md opacity-70 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-[#1e40af]/40 via-[#B600A8]/30 to-[#3b82f6]/40 blur-md opacity-70 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
             
             <img
               src={avatarUrl}
@@ -112,11 +67,6 @@ export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
                 e.currentTarget.src = DEFAULT_AVATAR;
               }}
             />
-
-            {/* Camera badge to insert/edit real photo */}
-            <div className="absolute bottom-0 right-0 p-1.5 rounded-full bg-[#0a192f] border border-[#3b82f6] text-[#93c5fd] shadow-lg group-hover:bg-[#1d4ed8] group-hover:text-white transition-colors">
-              <Camera className="w-3.5 h-3.5" />
-            </div>
           </div>
         </Magnet>
       </FadeIn>
