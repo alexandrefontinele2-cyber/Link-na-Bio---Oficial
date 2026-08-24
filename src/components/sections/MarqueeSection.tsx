@@ -2,34 +2,14 @@ import React, { useRef, useState, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Camera, Video } from 'lucide-react';
 import { getMediaItem, saveMediaItem } from '../../utils/mediaDb';
+import { EMBEDDED_MARQUEE_ROW1, EMBEDDED_MARQUEE_ROW2, MediaAsset } from '../../data/defaultMedia';
 
 export interface MarqueeMediaItem {
   id: string;
   url: string;
   type: 'image' | 'video' | 'gif';
+  title?: string;
 }
-
-const DEFAULT_ROW1: MarqueeMediaItem[] = [
-  { id: 'r1-1', url: 'https://motionsites.ai/assets/hero-space-voyage-preview-eECLH3Yc.gif', type: 'gif' },
-  { id: 'r1-2', url: 'https://motionsites.ai/assets/hero-codenest-preview-Cgppc2qV.gif', type: 'gif' },
-  { id: 'r1-3', url: 'https://motionsites.ai/assets/hero-vex-ventures-preview-BczMFIiw.gif', type: 'gif' },
-  { id: 'r1-4', url: 'https://motionsites.ai/assets/hero-stellar-ai-v2-preview-DjvxjG3C.gif', type: 'gif' },
-  { id: 'r1-5', url: 'https://motionsites.ai/assets/hero-asme-preview-B_nGDnTP.gif', type: 'gif' },
-  { id: 'r1-6', url: 'https://motionsites.ai/assets/hero-transform-data-preview-Cx5OU29N.gif', type: 'gif' },
-  { id: 'r1-7', url: 'https://motionsites.ai/assets/hero-vitara-preview-Cjz2QYyU.gif', type: 'gif' },
-  { id: 'r1-8', url: 'https://motionsites.ai/assets/hero-terra-preview-BFjrCr7T.gif', type: 'gif' },
-];
-
-const DEFAULT_ROW2: MarqueeMediaItem[] = [
-  { id: 'r2-1', url: 'https://motionsites.ai/assets/hero-stellar-ai-preview-D3HL6bw1.gif', type: 'gif' },
-  { id: 'r2-2', url: 'https://motionsites.ai/assets/hero-xportfolio-preview-D4A8maiC.gif', type: 'gif' },
-  { id: 'r2-3', url: 'https://motionsites.ai/assets/hero-orbit-web3-preview-BXt4OttD.gif', type: 'gif' },
-  { id: 'r2-4', url: 'https://motionsites.ai/assets/hero-nexora-preview-cx5HmUgo.gif', type: 'gif' },
-  { id: 'r2-5', url: 'https://motionsites.ai/assets/hero-evr-ventures-preview-DZxeVFEX.gif', type: 'gif' },
-  { id: 'r2-6', url: 'https://motionsites.ai/assets/hero-planet-orbit-preview-DWAP8Z1P.gif', type: 'gif' },
-  { id: 'r2-7', url: 'https://motionsites.ai/assets/hero-new-era-preview-CocuDUm9.gif', type: 'gif' },
-  { id: 'r2-8', url: 'https://motionsites.ai/assets/hero-wealth-preview-B70idl_u.gif', type: 'gif' },
-];
 
 const STORAGE_KEY_ROW1 = 'af_marquee_row1_media';
 const STORAGE_KEY_ROW2 = 'af_marquee_row2_media';
@@ -43,15 +23,15 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onToast }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<{ row: 1 | 2; index: number } | null>(null);
 
-  const [row1Items, setRow1Items] = useState<MarqueeMediaItem[]>(DEFAULT_ROW1);
-  const [row2Items, setRow2Items] = useState<MarqueeMediaItem[]>(DEFAULT_ROW2);
+  const [row1Items, setRow1Items] = useState<MarqueeMediaItem[]>(EMBEDDED_MARQUEE_ROW1);
+  const [row2Items, setRow2Items] = useState<MarqueeMediaItem[]>(EMBEDDED_MARQUEE_ROW2);
 
-  // Load from IndexedDB (persists high-capacity video and images indefinitely)
+  // Load from IndexedDB / LocalStorage if user has custom uploads, otherwise fallback to embedded
   useEffect(() => {
     let isMounted = true;
     async function loadStoredMedia() {
-      const savedRow1 = await getMediaItem<MarqueeMediaItem[]>(STORAGE_KEY_ROW1, DEFAULT_ROW1);
-      const savedRow2 = await getMediaItem<MarqueeMediaItem[]>(STORAGE_KEY_ROW2, DEFAULT_ROW2);
+      const savedRow1 = await getMediaItem<MarqueeMediaItem[]>(STORAGE_KEY_ROW1, EMBEDDED_MARQUEE_ROW1);
+      const savedRow2 = await getMediaItem<MarqueeMediaItem[]>(STORAGE_KEY_ROW2, EMBEDDED_MARQUEE_ROW2);
       if (isMounted) {
         if (savedRow1 && savedRow1.length > 0) setRow1Items(savedRow1);
         if (savedRow2 && savedRow2.length > 0) setRow2Items(savedRow2);
@@ -82,7 +62,11 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onToast }) => {
     const file = e.target.files?.[0];
     if (!file || !selectedSlotIndex) return;
 
-    const isVideo = file.type.startsWith('video/') || file.name.endsWith('.mp4') || file.name.endsWith('.mov') || file.name.endsWith('.webm');
+    const isVideo =
+      file.type.startsWith('video/') ||
+      file.name.endsWith('.mp4') ||
+      file.name.endsWith('.mov') ||
+      file.name.endsWith('.webm');
     const isGif = file.type === 'image/gif' || file.name.endsWith('.gif');
     const mediaType: 'image' | 'video' | 'gif' = isVideo ? 'video' : isGif ? 'gif' : 'image';
 
@@ -147,7 +131,7 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onToast }) => {
     return (
       <img
         src={item.url}
-        alt="Preview de trabalho e mídia animada"
+        alt={item.title || "Preview de trabalho e mídia animada"}
         loading="lazy"
         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         onError={(e) => {
