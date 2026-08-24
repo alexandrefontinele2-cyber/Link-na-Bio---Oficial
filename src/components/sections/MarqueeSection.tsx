@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { Camera, Video } from 'lucide-react';
 import { getMediaItem, saveMediaItem } from '../../utils/mediaDb';
 import { EMBEDDED_MARQUEE_ROW1, EMBEDDED_MARQUEE_ROW2, MediaAsset } from '../../data/defaultMedia';
 
@@ -15,10 +14,11 @@ const STORAGE_KEY_ROW1 = 'af_marquee_row1_media';
 const STORAGE_KEY_ROW2 = 'af_marquee_row2_media';
 
 interface MarqueeSectionProps {
+  isAdmin?: boolean;
   onToast?: (msg: string) => void;
 }
 
-export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onToast }) => {
+export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ isAdmin = false, onToast }) => {
   const sectionRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<{ row: 1 | 2; index: number } | null>(null);
@@ -54,6 +54,7 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onToast }) => {
   const xRow2 = useTransform(scrollYProgress, [0, 1], ['5%', '-35%']);
 
   const handleCardClick = (row: 1 | 2, index: number) => {
+    if (!isAdmin) return;
     setSelectedSlotIndex({ row, index });
     fileInputRef.current?.click();
   };
@@ -147,15 +148,17 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onToast }) => {
       ref={sectionRef}
       className="bg-[#060e1d] py-6 overflow-hidden relative select-none w-full border-y border-[#1a2c4e]/50"
     >
-      {/* Hidden file input for uploading and saving video or image */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="video/mp4,video/webm,video/quicktime,video/*,image/*,image/gif"
-        onChange={handleFileUpload}
-        className="hidden"
-        aria-label="Upload de vídeo ou foto"
-      />
+      {/* Hidden file input for uploading and saving video or image when admin is logged in */}
+      {isAdmin && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="video/mp4,video/webm,video/quicktime,video/*,image/*,image/gif"
+          onChange={handleFileUpload}
+          className="hidden"
+          aria-label="Upload de vídeo ou foto"
+        />
+      )}
 
       {/* Subtle vignette gradient on edges */}
       <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#060e1d] to-transparent z-10 pointer-events-none" />
@@ -173,8 +176,10 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onToast }) => {
               <div
                 key={`row1-${index}-${item.id}`}
                 onClick={() => handleCardClick(1, originalIndex)}
-                className="relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md cursor-pointer"
-                title="Clique caso queira reanexar ou ajustar seu vídeo/foto"
+                className={`relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md ${
+                  isAdmin ? 'cursor-pointer' : ''
+                }`}
+                title={isAdmin ? 'Clique caso queira reanexar ou ajustar seu vídeo/foto' : undefined}
               >
                 {renderMedia(item)}
                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors duration-200 pointer-events-none" />
@@ -194,8 +199,10 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({ onToast }) => {
               <div
                 key={`row2-${index}-${item.id}`}
                 onClick={() => handleCardClick(2, originalIndex)}
-                className="relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md cursor-pointer"
-                title="Clique caso queira reanexar ou ajustar seu vídeo/foto"
+                className={`relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md ${
+                  isAdmin ? 'cursor-pointer' : ''
+                }`}
+                title={isAdmin ? 'Clique caso queira reanexar ou ajustar seu vídeo/foto' : undefined}
               >
                 {renderMedia(item)}
                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors duration-200 pointer-events-none" />

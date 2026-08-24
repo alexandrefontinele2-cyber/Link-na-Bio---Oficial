@@ -1,29 +1,27 @@
-import React, { useState } from 'react';
+import React, { useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Instagram, Linkedin, Globe, Mail } from 'lucide-react';
+import { Instagram, Linkedin, Globe, Mail, Camera } from 'lucide-react';
 import { FadeIn } from '../common/FadeIn';
 import { Magnet } from '../common/Magnet';
 
 interface HeroProfileSectionProps {
+  avatarUrl: string;
+  isAdmin?: boolean;
   onOpenContact: () => void;
   onOpenSocial: (platform: string, url: string) => void;
+  onUpdateAvatar?: (url: string) => void;
 }
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600&auto=format&fit=crop';
-const STORAGE_KEY = 'alexandre_fontinele_avatar_photo';
 
 export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
+  avatarUrl,
+  isAdmin = false,
   onOpenContact,
   onOpenSocial,
+  onUpdateAvatar,
 }) => {
-  const [avatarUrl] = useState<string>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved || DEFAULT_AVATAR;
-    } catch {
-      return DEFAULT_AVATAR;
-    }
-  });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const socialLinks = [
     {
@@ -49,8 +47,31 @@ export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
     },
   ];
 
+  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onUpdateAvatar) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      onUpdateAvatar(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <header className="px-5 pt-8 pb-4 flex flex-col items-center text-center relative z-20">
+      {/* Hidden file input for Admin avatar change */}
+      {isAdmin && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleAvatarFile}
+          className="hidden"
+          aria-label="Upload de foto de perfil"
+        />
+      )}
+
       {/* 1. Status Badge */}
       <FadeIn delay={0} y={-10}>
         <div
@@ -70,12 +91,20 @@ export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
       {/* 2. Hero Portrait with Magnet effect */}
       <FadeIn delay={0.15} y={20} className="mt-4 mb-3">
         <Magnet strength={22}>
-          <div className="relative group">
+          <div
+            className={`relative group ${isAdmin ? 'cursor-pointer' : ''}`}
+            onClick={() => {
+              if (isAdmin) {
+                fileInputRef.current?.click();
+              }
+            }}
+            title={isAdmin ? 'Clique para trocar sua foto de perfil' : undefined}
+          >
             {/* Glow halo */}
             <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-[#1e40af]/40 via-[#B600A8]/30 to-[#3b82f6]/40 blur-md opacity-70 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
             
             <img
-              src={avatarUrl}
+              src={avatarUrl || DEFAULT_AVATAR}
               alt="Alexandre Fontinele"
               loading="eager"
               className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full border-2 border-[#93c5fd]/80 object-cover shadow-2xl transition-transform duration-300 group-hover:scale-[1.03]"
@@ -83,6 +112,14 @@ export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
                 e.currentTarget.src = DEFAULT_AVATAR;
               }}
             />
+
+            {/* Admin camera badge overlay (Visible ONLY when admin is logged in) */}
+            {isAdmin && (
+              <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-opacity text-[9px] font-bold uppercase tracking-wider">
+                <Camera className="w-5 h-5 mb-0.5 text-[#38bdf8]" />
+                <span>Trocar Foto</span>
+              </div>
+            )}
           </div>
         </Magnet>
       </FadeIn>

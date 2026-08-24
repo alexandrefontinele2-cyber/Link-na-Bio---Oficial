@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
+import { Camera, Upload } from 'lucide-react';
 import { LiveProjectButton } from '../common/LiveProjectButton';
 import { FadeIn } from '../common/FadeIn';
 
@@ -67,22 +68,25 @@ export const BASE_PROJECTS: ProjectData[] = [
 
 export const PROJECTS = BASE_PROJECTS;
 
-const STORAGE_KEY_PROJECT_IMAGES = 'af_project_custom_images';
-
 interface ProjectCardProps {
   project: ProjectData;
   index: number;
   total: number;
+  isAdmin?: boolean;
   onViewProject: (project: ProjectData) => void;
+  onUpdateImage?: (projectNumber: string, url: string) => void;
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({
   project,
   index,
-  total,
+  isAdmin = false,
   onViewProject,
+  onUpdateImage,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ['start end', 'start start'],
@@ -96,6 +100,17 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 
   const stickyTop = 20 + index * 14;
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onUpdateImage) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      onUpdateImage(project.number, reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -106,6 +121,18 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
       }}
       className="mb-6 last:mb-0"
     >
+      {/* Hidden file input for admin update */}
+      {isAdmin && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+          aria-label={`Upload imagem do case ${project.number}`}
+        />
+      )}
+
       <motion.div
         style={{ scale }}
         className="rounded-2xl border border-[#1e3a5f]/80 bg-[#0a192f]/95 backdrop-blur-md p-4 text-[#D7E2EA] shadow-xl hover:border-[#60a5fa]/60 transition-colors group cursor-pointer"
@@ -124,6 +151,22 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#040a17]/85 via-transparent to-transparent pointer-events-none" />
+
+          {/* Admin Edit Button on top-left of image */}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
+              className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-[#38bdf8] text-[10px] uppercase font-bold text-[#38bdf8] flex items-center gap-1 hover:bg-[#38bdf8] hover:text-black transition-colors z-20 shadow-md"
+              title="Trocar imagem deste case"
+            >
+              <Camera className="w-3 h-3" />
+              <span>Trocar Imagem</span>
+            </button>
+          )}
 
           {/* Year badge */}
           <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] uppercase font-mono tracking-wider text-[#D7E2EA]">
@@ -160,24 +203,21 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 };
 
 interface ProjectsSectionProps {
+  projectImages?: Record<string, string>;
+  isAdmin?: boolean;
   onViewProject: (project: ProjectData) => void;
+  onUpdateImage?: (projectNumber: string, url: string) => void;
 }
 
 export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
+  projectImages = {},
+  isAdmin = false,
   onViewProject,
+  onUpdateImage,
 }) => {
-  const [customImages] = useState<Record<string, string>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_PROJECT_IMAGES);
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
-
   const projects: ProjectData[] = BASE_PROJECTS.map((proj) => ({
     ...proj,
-    imageUrl: customImages[proj.number] || proj.imageUrl,
+    imageUrl: projectImages[proj.number] || proj.imageUrl,
   }));
 
   return (
@@ -197,7 +237,9 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
             project={project}
             index={index}
             total={projects.length}
+            isAdmin={isAdmin}
             onViewProject={onViewProject}
+            onUpdateImage={onUpdateImage}
           />
         ))}
       </div>
