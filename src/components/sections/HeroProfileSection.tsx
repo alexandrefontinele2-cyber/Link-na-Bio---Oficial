@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Instagram, Twitter, Linkedin, Youtube, Mail } from 'lucide-react';
+import { Instagram, Linkedin, Globe, Mail } from 'lucide-react';
 import { FadeIn } from '../common/FadeIn';
 import { Magnet } from '../common/Magnet';
 
 interface HeroProfileSectionProps {
   onOpenContact: () => void;
-  onOpenSocial: (platform: string) => void;
+  onOpenSocial: (platform: string, url: string) => void;
 }
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=600&auto=format&fit=crop';
@@ -26,11 +26,27 @@ export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
   });
 
   const socialLinks = [
-    { name: 'Instagram', icon: Instagram, url: 'https://instagram.com' },
-    { name: 'Linkedin', icon: Linkedin, url: 'https://linkedin.com' },
-    { name: 'Youtube', icon: Youtube, url: 'https://youtube.com' },
-    { name: 'Twitter', icon: Twitter, url: 'https://twitter.com' },
-    { name: 'Mail', icon: Mail, action: onOpenContact },
+    {
+      name: 'Instagram',
+      icon: Instagram,
+      url: 'https://www.instagram.com/fontenelleacademy/',
+    },
+    {
+      name: 'Linkedin',
+      icon: Linkedin,
+      url: 'https://www.linkedin.com/in/alexandre-fontinele-964463208/',
+    },
+    {
+      name: 'Site',
+      icon: Globe,
+      url: 'https://fontenelleacademy.com.br/',
+    },
+    {
+      name: 'Email',
+      icon: Mail,
+      url: 'mailto:contato@fontenelleacademy.com.br',
+      isMail: true,
+    },
   ];
 
   return (
@@ -96,13 +112,14 @@ export const HeroProfileSection: React.FC<HeroProfileSectionProps> = ({
                 whileHover={{ scale: 1.15, y: -2 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => {
-                  if (item.action) {
-                    item.action();
+                  if (item.isMail) {
+                    window.location.href = item.url;
                   } else {
-                    onOpenSocial(item.name);
+                    onOpenSocial(item.name, item.url);
                   }
                 }}
                 aria-label={item.name}
+                title={item.name}
                 className="w-8 h-8 rounded-full bg-[#0a182e]/80 border border-[#1e3a5f] text-[#D7E2EA] opacity-85 hover:opacity-100 hover:bg-[#1e3a5f] hover:border-[#38bdf8]/60 transition-all duration-200 cursor-pointer shadow-sm flex items-center justify-center"
               >
                 <Icon className="w-4 h-4" />

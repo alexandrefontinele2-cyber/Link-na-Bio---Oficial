@@ -38,9 +38,9 @@ export default function App() {
     setIsBookingOpen(true);
   };
 
-  const handleOpenSocial = (platform: string) => {
-    showToast(`Abrindo perfil de Alexandre Fontinele no ${platform}...`);
-    window.open(`https://${platform.toLowerCase()}.com`, '_blank', 'noopener,noreferrer');
+  const handleOpenSocial = (platform: string, url: string) => {
+    showToast(`Abrindo ${platform}...`);
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleOpenLink = (url: string, title: string) => {
