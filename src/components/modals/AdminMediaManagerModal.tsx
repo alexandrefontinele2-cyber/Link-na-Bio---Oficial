@@ -5,15 +5,14 @@ import {
   Upload,
   User,
   FolderKanban,
-  Video,
-  Check,
-  RotateCcw,
-  Sparkles,
   Camera,
+  Loader2,
+  Cloud,
 } from 'lucide-react';
 import { saveMediaItem } from '../../utils/mediaDb';
-import { BASE_PROJECTS, ProjectData } from '../sections/ProjectsSection';
-import { EMBEDDED_MARQUEE_ROW1, EMBEDDED_MARQUEE_ROW2 } from '../../data/defaultMedia';
+import { BASE_PROJECTS } from '../sections/ProjectsSection';
+import { saveGlobalSiteData } from '../../lib/firebase';
+import { optimizeImageForCloud } from '../../utils/imageOptimizer';
 
 interface AdminMediaManagerModalProps {
   isOpen: boolean;
@@ -34,50 +33,65 @@ export const AdminMediaManagerModal: React.FC<AdminMediaManagerModalProps> = ({
   onUpdateProjectImage,
   onToast,
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'cases' | 'marquee'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'cases'>('profile');
+  const [isSaving, setIsSaving] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const projectInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   if (!isOpen) return null;
 
-  const handleAvatarFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const result = reader.result as string;
-      onUpdateAvatar(result);
-      await saveMediaItem('alexandre_fontinele_avatar_photo', result);
-      try {
-        localStorage.setItem('alexandre_fontinele_avatar_photo', result);
-      } catch (err) {
-        // handled
-      }
-      onToast('Foto de perfil de Alexandre Fontinele salva com sucesso!');
-    };
-    reader.readAsDataURL(file);
+    try {
+      setIsSaving(true);
+      onToast('Otimizando e enviando foto para o banco de dados em nuvem...');
+      const optimizedUrl = await optimizeImageForCloud(file, 800, 800, 0.88);
+
+      onUpdateAvatar(optimizedUrl);
+      await saveMediaItem('alexandre_fontinele_avatar_photo', optimizedUrl);
+      
+      // Save globally to Firebase Cloud Firestore
+      await saveGlobalSiteData({ avatarUrl: optimizedUrl });
+
+      onToast('Foto de perfil salva na nuvem e visível para todos os visitantes!');
+    } catch (err) {
+      console.error('Error saving avatar:', err);
+      onToast('Erro ao sincronizar com a nuvem. Tentando salvar localmente.');
+    } finally {
+      setIsSaving(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
   };
 
-  const handleProjectFile = (projectNumber: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleProjectFile = async (projectNumber: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const result = reader.result as string;
-      onUpdateProjectImage(projectNumber, result);
+    try {
+      setIsSaving(true);
+      onToast(`Otimizando e enviando imagem do Case ${projectNumber}...`);
+      const optimizedUrl = await optimizeImageForCloud(file, 1280, 800, 0.85);
+
+      onUpdateProjectImage(projectNumber, optimizedUrl);
       
-      const current = { ...projectImages, [projectNumber]: result };
+      const current = { ...projectImages, [projectNumber]: optimizedUrl };
       await saveMediaItem('af_project_custom_images', current);
-      try {
-        localStorage.setItem('af_project_custom_images', JSON.stringify(current));
-      } catch (err) {
-        // handled
+      
+      // Save globally to Firebase Cloud Firestore
+      await saveGlobalSiteData({ projectImages: current });
+
+      onToast(`Imagem do Case ${projectNumber} salva na nuvem para todos os usuários!`);
+    } catch (err) {
+      console.error('Error saving project image:', err);
+      onToast('Erro ao sincronizar com a nuvem.');
+    } finally {
+      setIsSaving(false);
+      if (projectInputRefs.current[projectNumber]) {
+        projectInputRefs.current[projectNumber]!.value = '';
       }
-      onToast(`Imagem do Case ${projectNumber} atualizada com sucesso!`);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -92,9 +106,10 @@ export const AdminMediaManagerModal: React.FC<AdminMediaManagerModalProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-[#1e3a5f]/80">
             <div>
-              <span className="text-[10px] uppercase font-mono tracking-widest text-[#38bdf8] font-bold">
-                Painel do Administrador
-              </span>
+              <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono tracking-widest text-[#38bdf8] font-bold mb-0.5">
+                <Cloud className="w-3.5 h-3.5" />
+                <span>Painel do Administrador &bull; Sincronização em Nuvem</span>
+              </div>
               <h2 className="text-lg sm:text-xl font-bold uppercase tracking-tight text-white m-0">
                 Gerenciar Mídias e Imagens
               </h2>
@@ -108,8 +123,22 @@ export const AdminMediaManagerModal: React.FC<AdminMediaManagerModalProps> = ({
             </button>
           </div>
 
+          {/* Cloud status banner */}
+          <div className="mt-3 py-1.5 px-3 rounded-xl bg-[#060e1d] border border-[#1e3a5f] flex items-center justify-between text-xs text-[#93c5fd]">
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              Banco de dados em nuvem conectado
+            </span>
+            {isSaving && (
+              <span className="flex items-center gap-1 text-[11px] text-[#38bdf8] font-semibold">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Sincronizando...
+              </span>
+            )}
+          </div>
+
           {/* Tabs */}
-          <div className="grid grid-cols-2 gap-2 mt-4 mb-4">
+          <div className="grid grid-cols-2 gap-2 mt-3 mb-4">
             <button
               onClick={() => setActiveTab('profile')}
               className={`py-2 px-3 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-2 border transition-all ${
@@ -164,16 +193,21 @@ export const AdminMediaManagerModal: React.FC<AdminMediaManagerModalProps> = ({
                   Foto de Perfil (Avatar Superior)
                 </p>
                 <p className="text-xs text-[#93c5fd]/70 mb-4 max-w-xs">
-                  Envie sua foto em alta resolução. A alteração é salva instantaneamente no seu perfil.
+                  Envie sua foto em alta resolução. A alteração é salva no banco de dados em nuvem e fica visível para todos os navegadores.
                 </p>
 
                 <button
                   type="button"
+                  disabled={isSaving}
                   onClick={() => avatarInputRef.current?.click()}
-                  className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-[#1e40af] to-[#3b82f6] text-white font-medium text-xs uppercase tracking-wider hover:opacity-95 flex items-center gap-2 cursor-pointer shadow-md"
+                  className="py-2.5 px-5 rounded-xl bg-gradient-to-r from-[#1e40af] to-[#3b82f6] text-white font-medium text-xs uppercase tracking-wider hover:opacity-95 flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
                 >
-                  <Upload className="w-4 h-4" />
-                  <span>Selecionar Foto do Computador</span>
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
+                  <span>{isSaving ? 'Salvando na Nuvem...' : 'Selecionar Foto do Computador'}</span>
                 </button>
               </div>
             )}
@@ -222,8 +256,9 @@ export const AdminMediaManagerModal: React.FC<AdminMediaManagerModalProps> = ({
 
                       <button
                         type="button"
+                        disabled={isSaving}
                         onClick={() => projectInputRefs.current[proj.number]?.click()}
-                        className="py-1.5 px-3 rounded-lg bg-[#1e3a5f] hover:bg-[#2563eb] text-white text-[11px] font-semibold flex items-center gap-1.5 shrink-0 border border-[#38bdf8]/40 transition-colors"
+                        className="py-1.5 px-3 rounded-lg bg-[#1e3a5f] hover:bg-[#2563eb] text-white text-[11px] font-semibold flex items-center gap-1.5 shrink-0 border border-[#38bdf8]/40 transition-colors disabled:opacity-50"
                       >
                         <Upload className="w-3 h-3" />
                         <span>Trocar</span>
@@ -237,7 +272,7 @@ export const AdminMediaManagerModal: React.FC<AdminMediaManagerModalProps> = ({
 
           {/* Footer note */}
           <div className="pt-4 mt-2 border-t border-[#1e3a5f]/60 flex items-center justify-between text-xs text-[#93c5fd]/70">
-            <span>Todas as alterações são salvas automaticamente</span>
+            <span>Sincronizado automaticamente com o banco global</span>
             <button
               onClick={onClose}
               className="py-1.5 px-4 rounded-xl bg-[#1e3a5f] text-white font-medium text-xs hover:bg-[#38bdf8] hover:text-black transition-colors"

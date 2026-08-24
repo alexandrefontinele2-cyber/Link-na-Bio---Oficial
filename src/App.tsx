@@ -18,6 +18,8 @@ import { AdminMediaManagerModal } from './components/modals/AdminMediaManagerMod
 import { AdminToolbar } from './components/admin/AdminToolbar';
 import { Toast } from './components/common/Toast';
 import { getMediaItem, saveMediaItem } from './utils/mediaDb';
+import { subscribeToSiteData, saveGlobalSiteData, getGlobalSiteData } from './lib/firebase';
+import { optimizeImageForCloud } from './utils/imageOptimizer';
 
 const STORAGE_AVATAR_KEY = 'alexandre_fontinele_avatar_photo';
 const STORAGE_PROJECTS_KEY = 'af_project_custom_images';
@@ -42,14 +44,30 @@ export default function App() {
   const [avatarUrl, setAvatarUrl] = useState<string>(DEFAULT_AVATAR);
   const [projectImages, setProjectImages] = useState<Record<string, string>>({});
 
-  // Load avatar and custom project images on mount
+  // 1. Initial load from LocalStorage / IndexedDB + Cloud Firestore Realtime Sync
   useEffect(() => {
-    async function loadData() {
-      const savedAvatar = await getMediaItem<string>(STORAGE_AVATAR_KEY, DEFAULT_AVATAR);
-      if (savedAvatar) setAvatarUrl(savedAvatar);
+    let isMounted = true;
 
-      const savedProjects = await getMediaItem<Record<string, string>>(STORAGE_PROJECTS_KEY, {});
-      if (savedProjects) setProjectImages(savedProjects);
+    async function initData() {
+      // Step A: Load local fast cache first so there's zero flicker
+      const cachedAvatar = await getMediaItem<string>(STORAGE_AVATAR_KEY, DEFAULT_AVATAR);
+      if (cachedAvatar && isMounted) setAvatarUrl(cachedAvatar);
+
+      const cachedProjects = await getMediaItem<Record<string, string>>(STORAGE_PROJECTS_KEY, {});
+      if (cachedProjects && isMounted) setProjectImages(cachedProjects);
+
+      // Step B: Fetch direct from Firestore
+      const cloudData = await getGlobalSiteData();
+      if (cloudData && isMounted) {
+        if (cloudData.avatarUrl) {
+          setAvatarUrl(cloudData.avatarUrl);
+          await saveMediaItem(STORAGE_AVATAR_KEY, cloudData.avatarUrl);
+        }
+        if (cloudData.projectImages) {
+          setProjectImages(cloudData.projectImages);
+          await saveMediaItem(STORAGE_PROJECTS_KEY, cloudData.projectImages);
+        }
+      }
 
       // Check if previously logged in as admin
       const isAuthStored =
@@ -59,15 +77,34 @@ export default function App() {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('admin') === 'true') {
         if (isAuthStored) {
-          setIsAdmin(true);
+          if (isMounted) setIsAdmin(true);
         } else {
-          setIsAdminAuthOpen(true);
+          if (isMounted) setIsAdminAuthOpen(true);
         }
       } else if (isAuthStored) {
-        setIsAdmin(true);
+        if (isMounted) setIsAdmin(true);
       }
     }
-    loadData();
+
+    initData();
+
+    // Step C: Subscribe to Realtime Updates from Cloud Firestore across all devices
+    const unsubscribe = subscribeToSiteData((cloudData) => {
+      if (!isMounted || !cloudData) return;
+      if (cloudData.avatarUrl) {
+        setAvatarUrl(cloudData.avatarUrl);
+        saveMediaItem(STORAGE_AVATAR_KEY, cloudData.avatarUrl);
+      }
+      if (cloudData.projectImages) {
+        setProjectImages(cloudData.projectImages);
+        saveMediaItem(STORAGE_PROJECTS_KEY, cloudData.projectImages);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -98,7 +135,7 @@ export default function App() {
 
   const handleAdminSuccess = () => {
     setIsAdmin(true);
-    showToast('Modo Administrador ativado! Agora você pode editar suas fotos e vídeos.');
+    showToast('Modo Administrador ativado! Alterações agora são salvas na nuvem.');
   };
 
   const handleAdminLogout = () => {
@@ -109,26 +146,37 @@ export default function App() {
   };
 
   const handleUpdateAvatar = async (newUrl: string) => {
-    setAvatarUrl(newUrl);
-    await saveMediaItem(STORAGE_AVATAR_KEY, newUrl);
     try {
-      localStorage.setItem(STORAGE_AVATAR_KEY, newUrl);
-    } catch {
-      // handled
+      showToast('Otimizando e sincronizando foto na nuvem...');
+      const optimizedUrl = await optimizeImageForCloud(newUrl, 800, 800, 0.88);
+      setAvatarUrl(optimizedUrl);
+      await saveMediaItem(STORAGE_AVATAR_KEY, optimizedUrl);
+      await saveGlobalSiteData({ avatarUrl: optimizedUrl });
+      showToast('Foto de perfil salva na nuvem para todos os visitantes!');
+    } catch (err) {
+      console.error('Error updating avatar:', err);
+      setAvatarUrl(newUrl);
+      await saveMediaItem(STORAGE_AVATAR_KEY, newUrl);
+      showToast('Foto de perfil salva!');
     }
-    showToast('Foto de perfil atualizada e salva com sucesso!');
   };
 
   const handleUpdateProjectImage = async (projectNum: string, newUrl: string) => {
-    const updated = { ...projectImages, [projectNum]: newUrl };
-    setProjectImages(updated);
-    await saveMediaItem(STORAGE_PROJECTS_KEY, updated);
     try {
-      localStorage.setItem(STORAGE_PROJECTS_KEY, JSON.stringify(updated));
-    } catch {
-      // handled
+      showToast(`Otimizando e enviando imagem do Case ${projectNum}...`);
+      const optimizedUrl = await optimizeImageForCloud(newUrl, 1280, 800, 0.85);
+      const updated = { ...projectImages, [projectNum]: optimizedUrl };
+      setProjectImages(updated);
+      await saveMediaItem(STORAGE_PROJECTS_KEY, updated);
+      await saveGlobalSiteData({ projectImages: updated });
+      showToast(`Imagem do Case ${projectNum} salva na nuvem para todos os usuários!`);
+    } catch (err) {
+      console.error('Error updating project image:', err);
+      const updated = { ...projectImages, [projectNum]: newUrl };
+      setProjectImages(updated);
+      await saveMediaItem(STORAGE_PROJECTS_KEY, updated);
+      showToast(`Imagem do Case ${projectNum} salva!`);
     }
-    showToast(`Imagem do Case ${projectNum} salva com sucesso!`);
   };
 
   return (
