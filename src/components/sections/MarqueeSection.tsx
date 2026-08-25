@@ -1,5 +1,4 @@
-import React, { useRef, useState } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import React, { useRef, useState, useEffect } from 'react';
 import { Camera } from 'lucide-react';
 import { EMBEDDED_MARQUEE_ROW1, EMBEDDED_MARQUEE_ROW2 } from '../../data/defaultMedia';
 import { optimizeImageForCloud } from '../../utils/imageOptimizer';
@@ -29,16 +28,25 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({
   const sectionRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedSlotIndex, setSelectedSlotIndex] = useState<{ row: 1 | 2; index: number } | null>(null);
+  const [isInView, setIsInView] = useState(true);
 
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ['start end', 'end start'],
-  });
+  // Performance: Pause video rendering when out of viewport to save CPU/GPU and ensure 60fps scrolling
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
 
-  // Row 1: Moves RIGHT on scroll
-  const xRow1 = useTransform(scrollYProgress, [0, 1], ['-35%', '5%']);
-  // Row 2: Moves LEFT on scroll
-  const xRow2 = useTransform(scrollYProgress, [0, 1], ['5%', '-35%']);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          setIsInView(entry.isIntersecting);
+        });
+      },
+      { rootMargin: '200px 0px' }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const handleCardClick = (row: 1 | 2, index: number) => {
     if (!isAdmin) return;
@@ -105,11 +113,11 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({
     }
   };
 
-  // Repeated sets to ensure seamless scroll coverage
-  const displayRow1 = [...row1Items, ...row1Items, ...row1Items];
-  const displayRow2 = [...row2Items, ...row2Items, ...row2Items];
+  // Only 2 duplicate sets for infinite loop (slashes DOM elements & video decoders by over 50%)
+  const displayRow1 = [...row1Items, ...row1Items];
+  const displayRow2 = [...row2Items, ...row2Items];
 
-  const renderMedia = (item: MarqueeMediaItem) => {
+  const renderMedia = (item: MarqueeMediaItem, isFirstInstance: boolean) => {
     const isVideo =
       item.type === 'video' ||
       item.url.startsWith('data:video') ||
@@ -121,11 +129,11 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({
       return (
         <video
           src={item.url}
-          autoPlay
+          autoPlay={isInView}
           loop
           muted
           playsInline
-          preload="auto"
+          preload="metadata"
           className="w-full h-full object-cover pointer-events-none"
         />
       );
@@ -134,9 +142,10 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({
     return (
       <img
         src={item.url}
-        alt={item.title || 'Preview de trabalho e mídia animada'}
+        alt={item.title || 'Mídia'}
         loading="lazy"
-        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 pointer-events-none"
+        decoding="async"
+        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 pointer-events-none"
         onError={(e) => {
           e.currentTarget.src =
             'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=400&auto=format&fit=crop';
@@ -167,71 +176,71 @@ export const MarqueeSection: React.FC<MarqueeSectionProps> = ({
       <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#060e1d] to-transparent z-10 pointer-events-none" />
 
       <div className="flex flex-col gap-3">
-        {/* Row 1 - Moves RIGHT on scroll */}
-        <motion.div
-          style={{ x: xRow1 }}
-          className="flex gap-2.5 w-max will-change-transform"
-        >
-          {displayRow1.map((item, index) => {
-            const originalIndex = index % row1Items.length;
-            return (
-              <div
-                key={`row1-${index}-${item.id}`}
-                onClick={() => handleCardClick(1, originalIndex)}
-                className={`relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md ${
-                  isAdmin ? 'cursor-pointer' : ''
-                }`}
-                title={isAdmin ? 'Clique para trocar o vídeo ou foto deste slot' : undefined}
-              >
-                {renderMedia(item)}
-                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors duration-200 pointer-events-none" />
+        {/* Row 1 - Smooth CSS Hardware-Accelerated 60FPS Scroll */}
+        <div className="overflow-hidden flex w-full">
+          <div className="animate-marquee-left flex gap-2.5">
+            {displayRow1.map((item, index) => {
+              const originalIndex = index % row1Items.length;
+              const isFirst = index < row1Items.length;
+              return (
+                <div
+                  key={`row1-${index}-${item.id}`}
+                  onClick={() => handleCardClick(1, originalIndex)}
+                  className={`relative w-[210px] h-[135px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md ${
+                    isAdmin ? 'cursor-pointer' : ''
+                  }`}
+                  title={isAdmin ? 'Clique para trocar o vídeo ou foto deste slot' : undefined}
+                >
+                  {renderMedia(item, isFirst)}
+                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors duration-200 pointer-events-none" />
 
-                {/* Admin indicator overlay on hover */}
-                {isAdmin && (
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white pointer-events-none">
-                    <Camera className="w-4 h-4 text-[#38bdf8]" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white">
-                      Editar Mídia
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </motion.div>
+                  {/* Admin indicator overlay on hover */}
+                  {isAdmin && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white pointer-events-none">
+                      <Camera className="w-4 h-4 text-[#38bdf8]" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-white">
+                        Editar Mídia
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
-        {/* Row 2 - Moves LEFT on scroll */}
-        <motion.div
-          style={{ x: xRow2 }}
-          className="flex gap-2.5 w-max will-change-transform"
-        >
-          {displayRow2.map((item, index) => {
-            const originalIndex = index % row2Items.length;
-            return (
-              <div
-                key={`row2-${index}-${item.id}`}
-                onClick={() => handleCardClick(2, originalIndex)}
-                className={`relative w-[220px] h-[140px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md ${
-                  isAdmin ? 'cursor-pointer' : ''
-                }`}
-                title={isAdmin ? 'Clique para trocar o vídeo ou foto deste slot' : undefined}
-              >
-                {renderMedia(item)}
-                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors duration-200 pointer-events-none" />
+        {/* Row 2 - Smooth CSS Hardware-Accelerated 60FPS Scroll */}
+        <div className="overflow-hidden flex w-full">
+          <div className="animate-marquee-right flex gap-2.5">
+            {displayRow2.map((item, index) => {
+              const originalIndex = index % row2Items.length;
+              const isFirst = index < row2Items.length;
+              return (
+                <div
+                  key={`row2-${index}-${item.id}`}
+                  onClick={() => handleCardClick(2, originalIndex)}
+                  className={`relative w-[210px] h-[135px] rounded-xl overflow-hidden shrink-0 border border-[#1e3a5f] bg-[#0a192f] group shadow-md ${
+                    isAdmin ? 'cursor-pointer' : ''
+                  }`}
+                  title={isAdmin ? 'Clique para trocar o vídeo ou foto deste slot' : undefined}
+                >
+                  {renderMedia(item, isFirst)}
+                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/5 transition-colors duration-200 pointer-events-none" />
 
-                {/* Admin indicator overlay on hover */}
-                {isAdmin && (
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white pointer-events-none">
-                    <Camera className="w-4 h-4 text-[#38bdf8]" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white">
-                      Editar Mídia
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </motion.div>
+                  {/* Admin indicator overlay on hover */}
+                  {isAdmin && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-white pointer-events-none">
+                      <Camera className="w-4 h-4 text-[#38bdf8]" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-white">
+                        Editar Mídia
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </section>
   );

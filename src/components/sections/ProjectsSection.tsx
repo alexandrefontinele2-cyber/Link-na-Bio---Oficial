@@ -1,6 +1,5 @@
 import React, { useRef } from 'react';
-import { motion, useScroll, useTransform } from 'framer-motion';
-import { Camera, Upload } from 'lucide-react';
+import { Camera } from 'lucide-react';
 import { LiveProjectButton } from '../common/LiveProjectButton';
 import { FadeIn } from '../common/FadeIn';
 
@@ -84,21 +83,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
   onViewProject,
   onUpdateImage,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ['start end', 'start start'],
-  });
-
-  const scale = useTransform(
-    scrollYProgress,
-    [0, 1],
-    [0.94 + index * 0.015, 1]
-  );
-
-  const stickyTop = 20 + index * 14;
+  const stickyTop = 16 + index * 12;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -113,13 +99,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 
   return (
     <div
-      ref={containerRef}
       style={{
         position: 'sticky',
         top: `${stickyTop}px`,
         zIndex: 10 + index,
+        transform: 'translateZ(0)',
       }}
-      className="mb-6 last:mb-0"
+      className="mb-5 last:mb-0"
     >
       {/* Hidden file input for admin update */}
       {isAdmin && (
@@ -133,24 +119,24 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
         />
       )}
 
-      <motion.div
-        style={{ scale }}
-        className="rounded-2xl border border-[#1e3a5f]/80 bg-[#0a192f]/95 backdrop-blur-md p-4 text-[#D7E2EA] shadow-xl hover:border-[#60a5fa]/60 transition-colors group cursor-pointer"
+      <div
+        className="rounded-2xl border border-[#1e3a5f] bg-[#0a192f] p-4 text-[#D7E2EA] shadow-xl hover:border-[#60a5fa]/60 transition-all duration-200 group cursor-pointer"
         onClick={() => onViewProject(project)}
       >
         {/* Main tall image */}
-        <div className="relative h-48 w-full rounded-xl overflow-hidden mb-3 bg-[#071324] group/img">
+        <div className="relative h-44 w-full rounded-xl overflow-hidden mb-3 bg-[#071324] group/img">
           <img
             src={project.imageUrl}
             alt={project.title}
             loading="lazy"
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            decoding="async"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             onError={(e) => {
               e.currentTarget.src =
                 'https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=800&auto=format&fit=crop';
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#040a17]/85 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#040a17]/80 via-transparent to-transparent pointer-events-none" />
 
           {/* Admin Edit Button on top-left of image */}
           {isAdmin && (
@@ -160,7 +146,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
                 e.stopPropagation();
                 fileInputRef.current?.click();
               }}
-              className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-[#38bdf8] text-[10px] uppercase font-bold text-[#38bdf8] flex items-center gap-1 hover:bg-[#38bdf8] hover:text-black transition-colors z-20 shadow-md"
+              className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-full bg-black/80 border border-[#38bdf8] text-[10px] uppercase font-bold text-[#38bdf8] flex items-center gap-1 hover:bg-[#38bdf8] hover:text-black transition-colors z-20 shadow-md"
               title="Trocar imagem deste case"
             >
               <Camera className="w-3 h-3" />
@@ -169,7 +155,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
           )}
 
           {/* Year badge */}
-          <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-[10px] uppercase font-mono tracking-wider text-[#D7E2EA]">
+          <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/70 border border-white/10 text-[10px] uppercase font-mono tracking-wider text-[#D7E2EA]">
             {project.year}
           </div>
         </div>
@@ -177,7 +163,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
         {/* Bottom Row */}
         <div className="flex items-center justify-between gap-3 pt-1">
           <div className="flex items-center gap-3 min-w-0 pr-1">
-            <span className="font-black text-xl text-[#93c5fd] tracking-tighter shrink-0">
+            <span className="font-black text-xl text-[#93c5fd] tracking-tighter shrink-0 font-mono">
               {project.number}
             </span>
             <div className="min-w-0">
@@ -197,7 +183,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             }}
           />
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 };
@@ -223,7 +209,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({
   return (
     <section className="bg-[#060e1d] rounded-t-[32px] -mt-8 pt-8 px-5 pb-12 z-10 relative border-t border-[#1a2c4e]">
       {/* Heading */}
-      <FadeIn delay={0.1} y={15}>
+      <FadeIn delay={0.05} y={12}>
         <h2 className="hero-heading font-black uppercase text-3xl text-center mb-6 tracking-tight">
           CASES &amp; SOLUÇÕES
         </h2>
